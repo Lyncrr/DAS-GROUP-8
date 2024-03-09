@@ -1,0 +1,43 @@
+---
+title: "DAS GROUP 8 PROJECT "
+author: "Constantinos Anastasiou, Lin Lin, Yuang Tian, Yutong WU, Shengyuan Xia"
+number-sections: true
+format: 
+  html:
+    embed-resources: true
+    code-tools: true
+  pdf: default
+editor_options: 
+  chunk_output_type: console
+execute:
+  echo: false
+  eval: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: libraries
+library(ggplot2)
+library(tidyverse)
+library(gt)
+library(patchwork)
+library(gridExtra)
+library(moderndive)
+```
+
+```{r}
+#| label: data
+data <- read.csv("dataset08.csv")
+dataNEW <- na.omit(data)
+colnames(dataNEW) <- c("FILM ID", "YEAR RELEASED", "LENGTH", "BUDGET" , "VOTES" ,"GENRE" , "RATING") 
+
+```
+
+# Introduction {#sec-Intro}
+
+# Exploratory Data Analysis {#sec-EDA}
+
+# Formal Data Analysis {#sec-FDA}
+
+# Conclusions {#sec-Conc}
