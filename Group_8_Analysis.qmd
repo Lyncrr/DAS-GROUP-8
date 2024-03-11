@@ -24,6 +24,14 @@ library(gt)
 library(patchwork)
 library(gridExtra)
 library(moderndive)
+
+
+data <- read.csv("dataset08.csv")
+data
+films <- na.omit(data)
+
+
+films
 ```
 
 ```{r}
@@ -40,4 +48,15 @@ colnames(dataNEW) <- c("FILM ID", "YEAR RELEASED", "LENGTH", "BUDGET" , "VOTES" 
 
 # Formal Data Analysis {#sec-FDA}
 
-# Conclusions {#sec-Conc}
+```{r}
+
+#WE CONVERT RATING TO BINARY VARIABLE
+
+films$GREAT <- ifelse(films$rating > 7 , 1 ,0)
+films
+
+#FIT GLM
+#NOTE WE ARE NOT INCLUDING film id as it obviously doesn't have an effect on the film's rating
+glm_model <- glm(GREAT ~ film_id + year + length + budget + votes + genre , data = films , family = binomial)
+summary(glm_model)
+```
