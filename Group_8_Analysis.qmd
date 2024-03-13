@@ -17,29 +17,14 @@ execute:
 ---
 
 ```{r}
-#| label: libraries
+#| echo: false
 library(ggplot2)
 library(tidyverse)
 library(gt)
 library(patchwork)
 library(gridExtra)
 library(moderndive)
-
-
-data <- read.csv("dataset08.csv")
-data
-films <- na.omit(data)
-
-
-films
-```
-
-```{r}
-#| label: data
-data <- read.csv("dataset08.csv")
-dataNEW <- na.omit(data)
-colnames(dataNEW) <- c("FILM ID", "YEAR RELEASED", "LENGTH", "BUDGET" , "VOTES" ,"GENRE" , "RATING") 
-
+library(knitr)
 ```
 
 # Introduction {#sec-Intro}
@@ -49,14 +34,194 @@ colnames(dataNEW) <- c("FILM ID", "YEAR RELEASED", "LENGTH", "BUDGET" , "VOTES" 
 # Formal Data Analysis {#sec-FDA}
 
 ```{r}
+library(tidyverse)
+library(moderndive)
+library(gapminder)
+library(sjPlot)
+library(stats)
+library(jtools)
 
+
+
+#CLEANING DATA
+data <- read.csv("dataset08.csv")
+films <- na.omit(data)
+
+```
+
+We are fitting the following logistic regression model as seen below:
+
+$$
+g(p_i) = \log\left(\frac{p_i}{1-p_i}\right) = \mathbf{x}_i^\top \boldsymbol{\beta}
+$$
+
+where $p_i$ is the probability of getting a film rating higher than 7, and $\mathbf{x}_i^\top$ is the vector of covariates of the $i$th film.
+
+```{r}
 #WE CONVERT RATING TO BINARY VARIABLE
-
+data <- read.csv("dataset08.csv")
+films <- na.omit(data)
 films$GREAT <- ifelse(films$rating > 7 , 1 ,0)
-films
+levels(films$GREAT) <- c("less rating than 7" , "greater rating than 7")
 
 #FIT GLM
-#NOTE WE ARE NOT INCLUDING film id as it obviously doesn't have an effect on the film's rating
-glm_model <- glm(GREAT ~ film_id + year + length + budget + votes + genre , data = films , family = binomial)
-summary(glm_model)
+films$genre <- as.factor(films$genre)
+glm1 <- glm(GREAT ~ year + length + budget + genre , data = films , family= binomial(link = logit))
+
+summary(glm1) 
+```
+
+## Interpretation of coefficients
+
+Results indicate that a one year change (one unit change) in release increases the odds of a film receiving a rating greater than 7 by approximately exp(0.010238)= 1.01. Conversely, longer films tend to have slightly lower odds of receiving a rating greater than 7, with each additional minute decrease the odds by approximately exp(-0.056869 ) = 0.94. Budget demonstrates a significant positive association, with each additional unit of budget (in \$1000000s) increasing the odds of a film receiving a rating greater than 7 by approximately exp(0.509979) = 1.67. Regarding genre, comedy, documentary, and short films show significantly higher odds of receiving a rating greater than 7, while drama films tend to have lower odds. However, the effect of the "Romance" genre does not appear statistically significant. All the predictors we used except the "Romance genre" are statistically significant (at the 5% significance level) as their p-value is less than 0.5.
+
+## Log odds and 95% Confidence Intervals
+
+```{r}
+#| echo: false
+confint(glm1) %>%
+  kable()
+```
+
+```{r}
+plot_model(glm1, show.values = TRUE,
+           title = "Odds (Film rating higher than 7)", show.p = FALSE)
+```
+
+|                    | 2.5%    | 97.5%  |
+|--------------------|---------|--------|
+| (Intercept)        | -35.26  | -12.64 |
+| year               | 0.00    | 0.02   |
+| length             | -0.064  | -0.05  |
+| budget             | 0.45    | 0.57   |
+| genre: Animation   | -0.71   | 0.55   |
+| genre: Comedy      | 2.77    | 3.47   |
+| genre: Documentary | 4.79    | 6.53   |
+| genre: Drama       | -2.04   | -1.10  |
+| genre: Romance     | -126.17 | 5.33   |
+| genre: Short       | 2.65    | 5.92   |
+
+Thus from the plot and the values above our interpretations for the coefficients from before are confirmed. We interpret the odds ratios as follows: The lowest ones, romance genre films odds of getting a rating higher than 7 were 0.0004 times those of other genres, while the highest ones documentary films of getting a rating higher than 7 were 271.76 times higher than those of other genres. For each year increase in when the movie was released the odds of a rating higher than 7 increase by 1.01, while for each minute of increase of the movie's length the odds of a rating higher than 7 decreased (by a factor of 0.94). Finally, for a one million increase (\$) in budget the odds of a rating higher than 7 increased by a factor of 1.67.
+
+```{r}
+#Add log-odds to our data set
+films <- films %>%
+  mutate(logodds.great = predict(glm1))
+#Add odds to our data set
+films <- films %>%
+  mutate(odds.great = exp(logodds.great))
+
+#Add probabilities to our data set
+films <- films %>%
+  mutate(probs.great = fitted(glm1))
+
+
+```
+
+## Model Assessment and Model selection
+
+```{r}
+# ROC Curve Analysis
+library(pROC)
+roc_obj <- roc(films$GREAT, fitted(glm1))
+plot(roc_obj)
+auc(roc_obj)
+
+```
+
+From a first look at the ROC curve above and by the fact that the area under the curve is 0.95 which is close to 1, it seems that the model might be a good fit. Now to check whether the chi-squared approximation seems plausible to use for comparison with the deviance we must first check if the fitted values with the exception of the first one are quite large (\>5).
+
+```{r}
+#| echo: false
+p.hat <- predict(glm1 , type = "response")
+fitted <- nrow(films) * p.hat
+
+head(cbind(films$GREAT, round(fitted,2)))
+#chi squared
+qchisq(df = 2706 , p = 0.95)
+```
+
+So from the table above it can clearly be seen that they are indeed greater than 5. Thus, the chi-squared distribution as a measure of goodness of fit is valid here. So now we compare the residual deviance of the model ($1456.6$) to the 95th percentile of $\chi^2(2716-10) = 2828.132$ and it is obvious that $1456.6 < 2828.132$ . Therefore we don't have evidence of lack of fit.
+
+We will now examine the use of the following model just to see if we can achieve a better fit with a better model:
+
+$$
+g(p_i) = \boldsymbol \Phi ^{-1}(p_i) = \mathbf{x}_i^\top \boldsymbol{\beta}
+$$
+
+where $\boldsymbol \Phi$ denotes the cumulative distribution function of the standard normal distribution.
+
+```{r}
+glm2 <- glm(GREAT ~ year + length + budget + genre , data = films , family= binomial(link = 'probit'))
+summary(glm2)
+
+```
+
+From the output we are still able to conduct a goodness of fit test based on the residual deviance $(1473<2828.132)$ so no evidence of lack of fit here as well, but as the deviance of the logit model is slightly lower we can say that the fit of it is better. Finally a third choice of a link function we will consider is the complementary log-log link, with the model being:
+
+$$
+g(p_i) =  \log\left[-\log(1-p_i)\right] = \mathbf{x}_i^\top \boldsymbol{\beta}
+$$
+
+```{r}
+glm3 <- glm(GREAT ~ year + length + budget + genre , data = films , family= binomial(link = 'cloglog'))
+summary(glm3)
+```
+
+From the output from this third model the residual deviance is $(1602<2828.132)$ so again there's no evidence of lack of fit. However it seems that the logit has the lowest of the deviances out of them so we would expect that it is indeed the better model out of the three.
+
+```{r}
+
+# Calculate AIC and BIC values
+aic_values <- c(AIC(glm1), AIC(glm2), AIC(glm3))
+bic_values <- c(BIC(glm1), BIC(glm2), BIC(glm3))
+
+
+aic_bic_table <- data.frame(
+  Model = c("logit", "probit", "cloglog"),
+  AIC = aic_values,
+  BIC = bic_values
+)
+aic_bic_table
+```
+
+Based on the table above it is clear that the logit model we chose was the most appropriate one out of the three.
+
+## Probability plots based on logit model
+
+```{r}
+library(sjPlot)
+plot_model(glm1,type="pred",terms=c("budget[all]"), axis.title=c("Film budget ($ in millions)", "Probability that the film is rated higher than 7"),
+title="Probability of the film rated higher than 7 vs budget", ci.lvl=NA)
+
+plot_model(glm1,type="pred",terms=c("genre[all]"), axis.title=c("Film genre", "Probability that the film is rated higher than 7"),
+title="Probability of the film rated higher than 7 vs genre", ci.lvl=NA)
+
+
+plot_model(glm1,type="pred",terms=c("length[all]"), axis.title=c("Film length (in minutes)", "Probability that the film is rated higher than 7"),
+title="Probability of the film rated higher than 7 vs Film duration", ci.lvl=NA)
+```
+
+The probability plots above provide compelling insights into the influence of budget, genre, and length on the likelihood of a film receiving a rating greater than 7 on IMDb based on our logit model. Notably, budget emerges as a significant predictor, with each additional unit of financial investment substantially increasing the probability of achieving a higher rating. This finding underscores the importance of budget allocation in shaping audience perceptions and critical reception. Furthermore, genre analysis reveals distinct patterns: comedy, documentary, and short films exhibit notably favorable probabilities, suggesting a propensity for audience appeal and critical acclaim. Conversely, drama films present a contrasting scenario, indicating lower probabilities of receiving a higher rating. Finally, film length demonstrates a discernible trend, with shorter films showing slightly higher probabilities of attaining a rating above 7.
+
+# Conclusions {#sec-Conc}
+
+NOTE THIS SHOULD BE ADDED TO EXPLORATORY ANALYSIS
+
+```{r}
+
+library(janitor)
+films$GREAT <- as.factor(films$GREAT)
+films$genre <- as.factor(films$genre)
+levels(films$GREAT) <- c("less rating than 7" , "greater rating than 7")
+
+
+films %>%
+tabyl(genre, GREAT) %>%
+adorn_percentages() %>%
+adorn_pct_formatting() %>%
+adorn_ns() 
+
+
+
 ```
