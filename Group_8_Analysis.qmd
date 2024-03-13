@@ -66,17 +66,19 @@ levels(films$GREAT) <- c("less rating than 7" , "greater rating than 7")
 
 #FIT GLM
 films$genre <- as.factor(films$genre)
-glm1 <- glm(GREAT ~ year + length + budget + genre , data = films , family= binomial(link = logit))
-
-summary(glm1) 
+glm <- glm(GREAT ~ year + length + budget + genre + votes , data = films , family= binomial(link = logit))
+summary(glm)
+#refined model without votes as it is not statistically significant
+glm1 <- glm(GREAT ~ year + length + budget + genre    , data = films , family= binomial(link = logit))
 ```
 
 ## Interpretation of coefficients
 
-Results indicate that a one year change (one unit change) in release increases the odds of a film receiving a rating greater than 7 by approximately exp(0.010238)= 1.01. Conversely, longer films tend to have slightly lower odds of receiving a rating greater than 7, with each additional minute decrease the odds by approximately exp(-0.056869 ) = 0.94. Budget demonstrates a significant positive association, with each additional unit of budget (in \$1000000s) increasing the odds of a film receiving a rating greater than 7 by approximately exp(0.509979) = 1.67. Regarding genre, comedy, documentary, and short films show significantly higher odds of receiving a rating greater than 7, while drama films tend to have lower odds. However, the effect of the "Romance" genre does not appear statistically significant. All the predictors we used except the "Romance genre" are statistically significant (at the 5% significance level) as their p-value is less than 0.5.
+Results indicate that a one year change (one unit change) in release multiplies the odds of a film receiving a rating greater than 7 by approximately exp(0.010238)= 1.01. Conversely, longer films tend to have slightly lower odds of receiving a rating greater than 7, with each additional minute multiplying the odds by approximately exp(-0.056869 ) = 0.94. Budget demonstrates a significant positive association, with each additional unit of budget (in \$1000000s) multiplying the odds of a film receiving a rating greater than 7 by approximately exp(0.509979) = 1.67. Positive voting from people pretty much has no effect (multiplies the odds by 1.0000...) and it has a large p-value so it is not statistically significant. Regarding genre, comedy, documentary, and short films show significantly higher odds of receiving a rating greater than 7, while drama films tend to have lower odds. However, the effect of the "Romance" and "Animation" genre does not appear statistically significant. All the predictors we used except the "Romance genre", and the "Animation genre" are statistically significant (at the 5% significance level) as their p-value is less than 0.5.
 
 ## Log odds and 95% Confidence Intervals
 
+Note that the following work is done with the removal of the variable votes in order to make the model have a better fit.
 ```{r}
 #| echo: false
 confint(glm1) %>%
