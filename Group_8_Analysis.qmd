@@ -78,11 +78,11 @@ Results indicate that a one year change (one unit change) in release multiplies 
 
 ## Log odds and 95% Confidence Intervals
 
-Note that the following work is done with the removal of the variable votes in order to make the model have a better fit.
+Note that the following work is done with the removal of the variable votes in order to make the model have a better fit. The final optimal model is found here @sec-final-refined-optimal-model
 ```{r}
 #| echo: false
-confint(glm1) %>%
-  kable()
+#confint(glm1) %>%
+# kable()
 ```
 
 ```{r}
@@ -131,7 +131,7 @@ auc(roc_obj)
 
 ```
 
-From a first look at the ROC curve above and by the fact that the area under the curve is 0.95 which is close to 1, it seems that the model might be a good fit. Now to check whether the chi-squared approximation seems plausible to use for comparison with the deviance we must first check if the fitted values with the exception of the first one are quite large (\>5).
+From a first look at the ROC curve above and by the fact that the area under the curve is 0.95 which is close to 1, it seems that the model might be a good fit. Now to check whether the chi-squared approximation seems plausible to use for comparison with the deviance we must first check if the fitted values in the second column of the output with the exception of the first one are quite large (\>5).
 
 ```{r}
 #| echo: false
@@ -159,7 +159,7 @@ summary(glm2)
 
 ```
 
-From the output we are still able to conduct a goodness of fit test based on the residual deviance $(1473<2828.132)$ so no evidence of lack of fit here as well, but as the deviance of the logit model is slightly lower we can say that the fit of it is better. Finally a third choice of a link function we will consider is the complementary log-log link, with the model being:
+From the output of the model above we are still able to conduct a goodness of fit test based on the residual deviance $(1473<2828.132)$ so no evidence of lack of fit here as well, but as the deviance of the logit model is slightly lower we can say that the fit of it is better. Finally a third choice of a link function we will consider is the complementary log-log link, with the model being:
 
 $$
 g(p_i) =  \log\left[-\log(1-p_i)\right] = \mathbf{x}_i^\top \boldsymbol{\beta}
@@ -170,7 +170,7 @@ glm3 <- glm(GREAT ~ year + length + budget + genre , data = films , family= bino
 summary(glm3)
 ```
 
-From the output from this third model the residual deviance is $(1602<2828.132)$ so again there's no evidence of lack of fit. However it seems that the logit has the lowest of the deviances out of them so we would expect that it is indeed the better model out of the three.
+From the output from this third model above the residual deviance is $(1602<2828.132)$ so again there's no evidence of lack of fit. However it seems that the logit has the lowest of the deviances out of them so we would expect that it is indeed the better model out of the three.
 
 ```{r}
 
@@ -205,6 +205,61 @@ title="Probability of the film rated higher than 7 vs Film duration", ci.lvl=NA)
 ```
 
 The probability plots above provide compelling insights into the influence of budget, genre, and length on the likelihood of a film receiving a rating greater than 7 on IMDb based on our logit model. Notably, budget emerges as a significant predictor, with each additional unit of financial investment substantially increasing the probability of achieving a higher rating. This finding underscores the importance of budget allocation in shaping audience perceptions and critical reception. Furthermore, genre analysis reveals distinct patterns: comedy, documentary, and short films exhibit notably favorable probabilities, suggesting a propensity for audience appeal and critical acclaim. Conversely, drama films present a contrasting scenario, indicating lower probabilities of receiving a higher rating. Finally, film length demonstrates a discernible trend, with shorter films showing slightly higher probabilities of attaining a rating above 7.
+## Final refined optimal model {#sec-final-refined-optimal-model}
+
+We will now remove all the genres with the high p-values that are statistically insignificant, and we will create a refined model with the following output:
+
+```{r}
+# Create a subset of the dataframe without rows containing "Romance" or "Animation" in the genre column
+Refined_data <- subset(films, !(genre %in% c("Romance", "Animation")))
+
+#Create the the final refined glm
+refined_glm <-  glm(GREAT ~ year + length + budget + genre  , data = Refined_data , family= binomial(link = logit))
+summary(refined_glm)
+```
+
+```{r}
+#| echo: false
+qchisq(df = 2506 , p = 0.95)
+```
+
+This model now is the best possible model while also satisfying the goodness of fit, as deviance is less than 2623.573 and we have no variables with p-value greater than 0.05. The equation for this model now has become:
+
+$$
+ \log\left(\frac{p_i}{1-p_i}\right) = -36.09 + 0.02 \cdot year -0.06 \cdot length + 0.54 \cdot budget + 3.20 \cdot  \boldsymbol{\mathbb{I}_{Com}} + 5.65 \cdot  \boldsymbol{\mathbb{I}_{Doc}} -1.54 \cdot  \boldsymbol{\mathbb{I}_{Dra}} +4.2 \cdot  \boldsymbol{\mathbb{I}_{Short}} 
+$$
+
+where $\boldsymbol {\mathbb{I}}$ is the indicator function for each genre, that is 0 if it is not the corresponding genre and 1 if it is. For example $\boldsymbol {\mathbb{I}}_{Com}$ is 1 if the film is a Comedy. Note that a film in our dataset can never be two genres.
+
+```{r}
+#| echo: true
+
+#Odds ratios of variables
+exp(0.016167)   #year
+exp(-0.056306)  #length
+exp(0.542263)   #budget
+```
+
+Based on this model, when all other variables are held constant, a 1% increase in the odds of the film getting a rating greater than 7 is observed for every 1 year increase in film release. In addition when all other variables are held constant, for each minute increase in the movie, there is a 6% decrease in the odds of the film getting a rating greater than 7, while for each million added to the movie's budget the odds of the film getting a rating higher than 7 increase by 72%. What's more from the coefficient estimates we are seeing again the the highest estimate is reached when the genre of the movie is a documentary, once again confirming our initial impressions.
+
+```{r}
+plot_model(refined_glm , show.values = TRUE, transform = NULL, title = "Log-Odds", show.p = FALSE)
+```
+
+**Example of a prediction:**
+
+Here we will show an example of a prediction based on this refined model of a Comedy movie, released in 1982, with a duration of 100 minutes , budget of 10 million (\$).
+
+```{r}
+#| echo: true
+#odds of having a rating higher than 7
+exp(-36.085660 + (0.016167*1982) - (0.056306*100) + (0.542263*10) + 3.196425)  
+
+#probability of having a rating higher than 7
+exp(-36.085660 + (0.016167*1982) - (0.056306*100) + (0.542263*10) + 3.196425) / (1 + exp(-36.085660 + (0.016167*1982) - (0.056306*100) + (0.542263*10) + 3.196425))
+```
+
+Therefore, the odds of a film having a rating higher than 7 with these characteristics, is 0.34 and the probability of having a rating higher than 7 is approximately 26%.
 
 # Conclusions {#sec-Conc}
 
