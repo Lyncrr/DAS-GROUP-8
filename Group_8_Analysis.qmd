@@ -31,6 +31,145 @@ library(knitr)
 
 # Exploratory Data Analysis {#sec-EDA}
 
+## **Data Summary**
+
+```{r}
+library(tidyverse)
+library(gt)
+library(corrplot)
+mov <- read_csv("C:/Users/admin/Desktop/dataset08.csv")
+
+# solve NA (delete the NA rows)
+mov_1 <- na.omit(mov)
+
+# 1. data summary
+library(gt)
+summary(mov_1)
+mov_1 %>%
+  select(-film_id) %>%
+  select(where(is.numeric)) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value") %>%
+  group_by(Variable) %>%
+  summarise(
+    'Mean' = mean(Value),
+    'Median' = median(Value),
+    'St.Dev' = sd(Value),
+    'Min' = min(Value),
+    'Max' = max(Value),
+    'IQR' = IQR(Value),
+  ) %>%
+  gt() %>%
+  fmt_number(decimals = 2) %>%
+  cols_label(
+    Variable = "Variable",
+    Mean = "Mean",
+    Median = "Median",
+    St.Dev = "Std. Dev",
+    Min = "Minimum",
+    Max = "Maximum",
+    IQR = "IQR"
+  )
+```
+
+## **Histograms for Numeric Variables**
+
+```{r}
+#univariate analysis
+# histogram
+
+ggplot(mov_1, aes(x = rating)) + 
+  geom_histogram(binwidth = 0.5, fill = "#69b3a2", color = "#404040") +  # 使用自定义颜色
+  labs(title = "Rating Distribution", x = "IMDB Rating", y = "Count")
+```
+
+1.The distribution of ratings shows a bimodal trend, with one peak occurring at about 3.8 and the other at about 7.6. This could mean that films are either getting above average ratings or higher ratings, with fewer films getting intermediate ratings.
+
+3.Relatively few films received very low (below 2.5) or very high (close to 10) ratings.
+
+4.The number of highly rated films seems to be greater than the number of lowly rated films, probably because IMDB users are more inclined to rate films they like.
+
+## **Boxplots for Numeric Variables**
+
+```{r}
+# boxplot - budget
+p2 <- ggplot(mov_1, aes(x = genre, y = rating, fill = genre)) +  # 在aes()中设置fill参数
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Set3") +  # 使用Set3配色方案
+  labs(x = "Genre", y = "Rating", title = "Rating by Genre")
+print(p2)
+```
+
+## **Bar chart - genre**
+
+```{r}
+mov_1$rating_category <- ifelse(mov_1$rating >= 7, '7+', 'Below 7')
+ggplot(mov_1, aes(x=genre, fill=rating_category)) +
+  geom_bar() +
+  scale_fill_manual(values=c('7+' = 'blue', 'Below 7' = 'skyblue')) +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(title="Movie Genre Frequency by Rating Category", x="Genre", y="Count")
+```
+
+This bar chart shows the frequency distribution of different film genres. According to the chart: The Action and Drama genres have the highest number of films, with Drama having the highest number, followed closely by Action. Documentary and Comedy are relatively few in number.Animation, Romance and Short films are the least numerous, with Short films being the lowest.
+
+## Scatter plots
+
+```{r}
+# Scatterplot - Budget & rating
+ggplot(mov_1, aes(x=budget, y=rating)) +
+  geom_point(aes(color=genre), alpha=0.5) + 
+  scale_color_brewer(palette="Set2") +
+  labs(title="Budget vs. Rating by Genre", x="Budget", y="IMDB Rating")
+ggplot(mov_1, aes(x=length, y=rating)) +
+  geom_point(aes(color=genre), alpha=0.5) + 
+  scale_color_brewer(palette="Set2") +
+  labs(title="Length vs. Rating by Genre", x="length", y="IMDB Rating")
+ggplot(mov_1, aes(x=votes, y=rating)) +
+  geom_point(aes(color=genre), alpha=0.5) + 
+  scale_color_brewer(palette="Set2") +
+  labs(title="Votes vs. Rating by Genre", x="votes", y="IMDB Rating")
+ggplot(mov_1, aes(x=year, y=rating)) +
+  geom_point(aes(color=genre), alpha=0.5) + 
+  scale_color_brewer(palette="Set2") +
+  labs(title="Year vs. Rating by Genre", x="year", y="IMDB Rating")
+
+```
+
+### Budget-rating relationship
+
+The graph shows the distribution of different types of films (indicated by different colours) in terms of budget and IMDB rating. Overall, there is no obvious direct relationship between budget and IMDB rating, even for films with higher budgets, their ratings cover a wide range from low to high.
+
+
+## Correlation coefficient matrix
+
+```{r}
+par(mfrow=c(1,1), mar=c(0,0,2,0))  
+numerical_mov_1 <- mov_1 %>% select(rating, year, budget, votes, length) 
+cor_matrix <- cor(numerical_mov_1, use="complete.obs") 
+corrplot(cor_matrix, method="circle", addCoef.col = "black",  # 添加黑色的颜色键
+         tl.cex = 0.7,            
+         cl.cex = 0.7,            
+         tl.srt = 0 )            
+```
+
+-   **Votes and Budget**: There seems to be a moderately strong positive correlation between votes and budget, suggesting that films with larger budgets might also receive more votes, possibly indicating higher viewer engagement or more extensive marketing campaigns.
+
+-   **Votes and Length**: There appears to be a small to moderate positive correlation, which might suggest that longer films tend to receive more votes. This could reflect a trend that more substantial, possibly more serious films garner more engagement.
+
+-   **Rating and Length**: There is a small negative correlation indicated by a light red color, suggesting that longer films might have slightly lower ratings, but the relationship seems weak.
+
+-   **Rating and Budget**: There seems to be very little to no correlation between budget and rating, indicating that a larger budget does not necessarily correspond to higher ratings.
+
+## Kruskal-Wallis Test
+
+```{r}
+# We want to test whether there is a significant difference in film ratings across genres
+library(stats)
+kruskal.test(rating ~ genre, data=mov_1) # Kruskal-Wallis test
+```
+
+According to the Kruskal-Wallis test above, this very small p-value suggests that we have enough evidence to reject this null hypothesis to conclude that there is a significant difference in the ratings of different types of films. In other words, the genre of a film is likely to have an effect on its IMDb rating.
+
 # Formal Data Analysis {#sec-FDA}
 
 ```{r}
